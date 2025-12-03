@@ -1,4 +1,4 @@
-// swift-tools-version: 5.7
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
@@ -6,10 +6,10 @@ import PackageDescription
 let package = Package(
     name: "CachePropertyKit",
     platforms: [
-        .iOS(.v15),
-        .tvOS(.v15),
-        .watchOS(.v8),
-        .macOS(.v12)
+        .iOS(.v16),
+        .tvOS(.v16),
+        .watchOS(.v9),
+        .macOS(.v13)
     ],
     products: [
         .library(
@@ -19,13 +19,11 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "CachePropertyKit",
-            path: "Sources"
+            name: "CachePropertyKit"
         ),
         .testTarget(
             name: "CachePropertyKitTests",
-            dependencies: ["CachePropertyKit"],
-            path: "Tests"
+            dependencies: ["CachePropertyKit"]
         ),
     ]
 )

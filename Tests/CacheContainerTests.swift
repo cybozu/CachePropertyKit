@@ -15,7 +15,7 @@ final class CacheContainerTests: XCTestCase {
         sut.setValue(true, forKey: "key.value3")
 
         CacheContainer.clearAll()
-        XCTAssertTrue(sut.storage.isEmpty)
+        XCTAssertTrue(sut.storage.withLock(\.isEmpty))
     }
 
     func test_clearAllWhere_remove_only_specified_caches() {
@@ -24,7 +24,7 @@ final class CacheContainerTests: XCTestCase {
         sut.setValue(true, forKey: "key.value3")
 
         CacheContainer.clearAll(where: { $0 == "key.value1" })
-        XCTAssertEqual(sut.storage.keys.sorted(), ["key.value2", "key.value3"])
+        XCTAssertEqual(sut.storage.withLock(\.keys).sorted(), ["key.value2", "key.value3"])
     }
 
     func test_value_return_nil_when_a_non_cached_key_is_given() {
@@ -38,6 +38,17 @@ final class CacheContainerTests: XCTestCase {
         let data: CacheContainer.CacheData<String>? = sut.value(forKey: "key.value")
         XCTAssertEqual(data, .init(value: "value", cacheDate: cacheDate))
     }
+
+    func test_setValue_concurrently() async throws {
+        let cacheDate = try Date("2023-01-01T00:00:00Z", strategy: .iso8601)
+        (0..<100).forEach { i in
+            Task.detached { [sut] in
+                sut.setValue("value\(i)", forKey: "key.value\(i)", cacheDate: cacheDate)
+            }
+        }
+        await Task.megaYield()
+        XCTAssertEqual(sut.storage.withLock(\.count), 100)
+    }
 }
 
 extension CacheContainer.CacheData<String>: Equatable {
@@ -46,3 +57,10 @@ extension CacheContainer.CacheData<String>: Equatable {
     }
 }
 
+private extension Task where Success == Never, Failure == Never {
+    static func megaYield(count: Int = 10) async {
+        for _ in 0..<count {
+            await Task<Void, Never>.detached(priority: .background) { await Task.yield() }.value
+        }
+    }
+}

@@ -1,23 +1,28 @@
 import Foundation
+import os
 
-public final class CacheContainer {
+public final class CacheContainer: Sendable {
     static let shared = CacheContainer()
 
     public static func clearAll() {
-        shared.storage.forEach { (key, _) in
-            shared.storage.removeValue(forKey: key)
-        }
-    }
-
-    public static func clearAll(where shouldBeCleared: (CacheKey) -> Bool) {
-        shared.storage.forEach { (key, _) in
-            if shouldBeCleared(key) {
-                shared.storage.removeValue(forKey: key)
+        shared.storage.withLock { storage in
+            storage.keys.forEach {
+                storage.removeValue(forKey: $0)
             }
         }
     }
 
-    var storage: [CacheKey : Data] = [:]
+    public static func clearAll(where shouldBeCleared: @Sendable (CacheKey) -> Bool) {
+        shared.storage.withLock { storage in
+            storage.keys.forEach {
+                if shouldBeCleared($0) {
+                    storage.removeValue(forKey: $0)
+                }
+            }
+        }
+    }
+
+    let storage = OSAllocatedUnfairLock<[CacheKey : Data]>(initialState: [:])
 
     private let decoder = JSONDecoder()
     private let encoder = JSONEncoder()
@@ -26,11 +31,11 @@ public final class CacheContainer {
 
     func setValue<Value: Cacheable>(_ value: Value, forKey key: CacheKey, cacheDate: Date = .now) {
         let data = try? encoder.encode(CacheData(value: value, cacheDate: cacheDate))
-        storage[key] = data
+        storage.withLock { $0[key] = data }
     }
 
     func value<Value: Cacheable>(forKey key: CacheKey) -> CacheData<Value>? {
-        guard let data = storage[key] else {
+        guard let data = storage.withLock(\.[key]) else {
             return nil
         }
 
